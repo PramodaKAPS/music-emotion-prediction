@@ -27,6 +27,11 @@ XANEW_URL = 'https://raw.githubusercontent.com/JULIELab/XANEW/master/Ratings_War
 EMOBANK_URL = 'https://raw.githubusercontent.com/PramodaKAPS/SongsEmotions/main/emobank.csv'
 SPOTIFY_URL = 'https://raw.githubusercontent.com/PramodaKAPS/SongsEmotions/main/spotify_songs.csv'
 
+tokenizer = AutoTokenizer.from_pretrained('distilbert-base-uncased')
+model = AutoModel.from_pretrained('distilbert-base-uncased')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)  # Move model to GPU/CPU
+
 # Download datasets
 def download_csv(url):
     response = requests.get(url)
@@ -153,14 +158,16 @@ model = AutoModel.from_pretrained('distilbert-base-uncased')
 
 def get_bert_embeddings(texts, max_length=512):
     embeddings = []
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Define device inside function (optional)
     for text in texts:
         sentences = sent_tokenize(text) if len(text) > max_length else [text]
         sentence_embeddings = []
         for sentence in sentences:
             inputs = tokenizer(sentence, return_tensors='pt', truncation=True, padding=True, max_length=max_length)
+            inputs = {k: v.to(device) for k, v in inputs.items()}  # Move inputs to device
             with torch.no_grad():
                 outputs = model(**inputs)
-            embedding = outputs.last_hidden_state.mean(dim=1).squeeze().numpy()
+            embedding = outputs.last_hidden_state.mean(dim=1).squeeze().cpu().numpy()  # Move back to CPU for numpy
             sentence_embeddings.append(embedding)
         embeddings.append(np.mean(sentence_embeddings, axis=0) if sentence_embeddings else np.zeros(768))
     return np.array(embeddings)
